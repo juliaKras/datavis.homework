@@ -91,16 +91,26 @@ loadData().then(data => {
        const selection = barChart.selectAll('rect').data(barData);
        const bars = selection.enter().append('rect');
 
+       xBarAxis.call(d3.axisBottom().scale(xBar));
+       yBarAxis.call(d3.axisLeft().scale(yBar));
+
        selection.merge(bars)
-               .attr('x', d => xBar(d.key)) 
-               .attr('y', d => yBar(d.value))
-               .attr('fill', d=>colorScale(d.key))
-               .attr('height',d => height - yBar(d.value))
-               .attr('width', 100);
+            
+            .attr('x', d => xBar(d.key)) 
+            .attr('y', d => yBar(d.value))
+            .attr('fill', d=>colorScale(d.key))
+            .attr('height',d => height - yBar(d.value))
+            .attr('width', 100)
+            .attr('reg', function(d){return d.keyR})
+            .on('click', function(d){barChart.selectAll('rect')
+            .style('opacity', '0.5'); d3.select(this).style('opacity', '1');
+            updateScattePlot(reg = d3.select(this).attr('reg'))});
+
+            
     }
     
 
-    function updateScatterPlot(){
+    function updateScatterPlot(reg = ''){
         const xValues = data.map(d => Number(d[xParam][year])); // массив
         const xDomain = d3.extent(xValues); // [min, max]
         x.domain(xDomain); // [min, max] по xParam
@@ -120,15 +130,72 @@ loadData().then(data => {
         const radiusScale = d3.scaleSqrt().range([10, 30]).domain([d3.min(data, function(d){return +d[rParam][year]}), d3.max(data, function(d){return +d[rParam][year]})]);
 
         selection.merge(circles)
-                .attr('r', 50)
+    
+                .attr('r', function(d){return radiusScale(d[rParam][year])})
                 .attr('cx', d => x(Number(d[xParam][year])))
                 .attr('cy', d => y(Number(d[yParam][year])))
-                .attr('fill', d=>colorScale(d.region));
-            
-    }
+                .attr('fill', d=>colorScale(d.region))
+                .attr('country', function(d){return d.country})
+                .on('click', function(d){selected = d3.select(this).attr('country'); countryName.html(selected); updateLineChart();
+                scatterPlot.selectAll('circle').style('opacity', '0.65'); 
+                scatterPlot.append('circle').attr('r', d3.select(this).attr('r'))
+                .attr('cx', d3.select(this).attr('cx'))
+                .attr('cy', d3.select(this).attr('cy'))
+                .attr('fill', d3.select(this).attr('fill'))
+                .style('opacity', '1')
+            });
+        
 
+            if (reg != ''){scatterPlot.selectAll('circle')
+            .filter(d => d.region != reg).style('visibility', 'hidden')};
+        return;
+    }
+        function updateLineChart(){
+            lineChart.selectAll('path').remove()
+
+            if (selected != '' ){var country = data.filter(function(c){return c.country == selected})
+            .map(function(c) {return Object.values(c[lineParam])});
+
+
+            
+            var linedata = [];
+            var year = d3.range(1800,2021).map(function(y){return new Date(y,0)});
+            console.log(year);
+            
+
+            year.forEach(function (y, index) {linedata.push({'keyY': y, 'keyV': Number(country[0][index])})});
+
+
+            var x = d3.scaleTime().domain([d3.min(linedata, function (d){return +d.keyY}), d3.max(linedata, function (d){return +d.keyY}) ])
+            .range([margin*2, width-margin]);
+
+            var y = d3.scaleLinear()
+            .domain([d3.min(linedata, function (d){return +d.keyV}), d3.max(linedata, function (d){return +d.keyV}) ])
+            .range([height-margin, margin]);
+
+
+            xLineAxis.call(d3.axisBottom().tickFormat(d3.timeFormat("%Y")).scale(x)) 
+            yLineAxis.call(d3.axisLeft().scale(y)) 
+
+
+            lineChart.append('g')
+            .append('path')
+            .datum(linedata)
+            .attr('stroke', 'blue')
+            .attr('stroke-width', 1.5)
+            .style('fill', 'none')
+            .attr('d', d3.line()
+            .x(d => x(d.keyY))
+            .y(d => y(d.keyV)))
+
+
+            }
+        
+            return;
+    }
     updateBar();
-    updateScattePlot();
+    updateLineChart();
+    updateScatterPlot();
 });
 
 
